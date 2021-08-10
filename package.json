@@ -1,0 +1,24 @@
+{
+  "name": "music-unbounder-js",
+  "version": "1.0.0",
+  "description": "A discord bot for the Music Unbounded Server",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jameszf/Music-Unbounder-JS.git"
+  },
+  "author": "James Fu",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Jameszf/Music-Unbounder-JS/issues"
+  },
+  "homepage": "https://github.com/Jameszf/Music-Unbounder-JS#readme",
+  "dependencies": {
+    "@google-cloud/firestore": "^4.14.1",
+    "discord.js": "^13.0.1",
+    "node": "^14.17.4"
+  }
+}
