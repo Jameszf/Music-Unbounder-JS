@@ -2,4 +2,8 @@
 node_modules
 
 *.swp
+serviceAccount.json
+credentials.json
+token.json
+
 
