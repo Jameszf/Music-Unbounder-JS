@@ -2,7 +2,6 @@
   "name": "music-unbounder-js",
   "version": "1.0.0",
   "description": "A discord bot for the Music Unbounded Server",
-  "type": "module",
   "main": "src/index.js",
   "scripts": {
     "test": "test"
@@ -18,10 +17,14 @@
   },
   "homepage": "https://github.com/Jameszf/Music-Unbounder-JS#readme",
   "dependencies": {
+    "@discordjs/builders": "^0.6.0",
+    "@discordjs/rest": "^0.1.0-canary.0",
+    "discord-api-types": "^0.22.0",
     "discord.js": "^13.0.1",
+    "dotenv": "^10.0.0",
     "firebase-admin": "^9.11.0",
     "googleapis": "^84.0.0",
     "node": "^14.17.4",
-    "node-cron": "^3.0.0"
+    "node-schedule": "^2.0.0"
   }
 }

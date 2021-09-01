@@ -1,7 +1,8 @@
 
-import * as fs from "fs"
-import * as readline from "readline"
-import {google} from "googleapis"
+const fs = require("fs")
+const readline = require("readline")
+const { google } = require("googleapis")
+
 
 // If modifying these scopes, delete token.json.
 const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
@@ -97,6 +98,21 @@ function getNewToken(service) {
 }
 
 
+
+function isOperational(service) {
+    return new Promise((resolve, reject) => {
+        try { 
+            service.users.labels.list({ userId: "me" })
+            resolve(true)
+        } catch (error) {
+            console.log("ERROR!")
+            console.log(error)
+            resolve(false)
+        }
+    })
+}
+
+
 /*
 export default {
     use(callback) {
@@ -130,19 +146,21 @@ async function listLabels() {
 listLabels()
 */
 
-let service
-
-export default {
+let service = undefined
+module.exports = {
     getService: function() {
         return new Promise(async (resolve, reject) => {
             if (service == undefined) {
                 const auth = await authorize()
                 service = google.gmail({version: "v1", auth: auth})
             }
+
             resolve(service)
         })
-    }
+    },
+    isOperational
 }
+
 
 
 
