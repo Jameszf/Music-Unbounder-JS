@@ -37,14 +37,62 @@ function getAllJobs() {
 
 
 
-async function regExists(reg) {
+function softTeacherMatch(teach) {
     return new Promise((resolve, reject) => {
-        db.collection("Registered")
-            .where("Name", "==", reg.Name)
-            .where("Guardian", "==", reg.Guardian)
-            .where("Instrument", "==", reg.Instrument).get().then(snapshot => {
+        db.collection("Teachers")
+            .where("Name", "==", teach["Name"])
+            .where("Email", "==", teach["Email"])
+            .where("Phone", "==", teach["Phone"])
+            .get().then(snapshot => {
                 resolve(!snapshot.empty)
             }).catch(err => reject(err))
+}
+
+
+
+function softStudentMatch(stud) {
+    return new Promise((resolve, reject) => {
+        db.collection("Students")
+            .where("Registerd_ID", "==", stud["Registered_ID"])
+            .where("Teacher_ID", "==", stud["Teacher_ID"])
+            .get().then(snapshot => {
+                resolve(!snapshot.empty)
+            }).catch(err => reject(err))
+}
+
+
+
+function softRegisteredMatch(reg) {
+    return new Promise((resolve, reject) => {
+        db.collection("Registered")
+            .where("Name", "==", reg["Name"])
+            .where("Guardian", "==", reg["Guardian"])
+            .where("Instrument", "==", reg["Instrument"]).get().then(snapshot => {
+                resolve(!snapshot.empty)
+            }).catch(err => reject(err))
+}
+
+
+
+async function exists(coll, input) {
+    return new Promise((resolve, reject) => {
+        if (coll === undefined) reject("Need collection to search with.")
+        if (typeof input === "string") { // search by ID
+            db.collection(coll)
+                .doc(input).get().then(snapshot => {
+                    resolve(!snapshot.empty)
+                }).catch(err => reject(err))
+        } else {
+            if (coll === "Teachers") {
+                resolve(await softTeacherMatch(input))
+            } else if (coll === "Students") {
+                resolve(await softStudentMatch(input))
+            } else if (coll === "Registered) {
+                resolve(await softRegisteredMatch(input))
+            } else {
+                reject(`Unmatchable input: (collection) ${coll}\n(input) ${input}`)
+            }
+        }
     })
 }
 
@@ -58,17 +106,43 @@ function newHistory(hist) {
 
 
 
-// DOES NOT CHECK IF REG IS ALREADY IN DB
-function addRegistered(reg) {
-    const docRef = db.collection("Registered").doc()
-    reg["ID"] = docRef.id
-    reg["Joined_On"] = reg["Joined_On"] != undefined ? reg["Joined_On"] : Date.now()
+function searchByFields(collection, fieldValues) {
+    let req = db.collection(collection)
+    Object.keys(fieldValues).forEach(key => {
+        req = req.where(key, "==", fieldValues[key])
+    })
+    return getDocsFromQuery(req)
+}
 
-    const data = {...reg}
-    Object.keys(data).forEach(x => {
-        if (x != "Joined_On" && x != "ID" && data[x] == undefined) {
-            data[x] = ""
-        }
+
+
+function addToFirestore(obj) {
+    // TODO add support for Jobs
+    let collection
+    if (obj instanceof Teacher) {
+        collection = "Teachers"
+    } else if (obj instanceof Student) {
+        collection = "Students"
+    } else if (obj instanceof Registered) {
+        collection = "Registered"
+    } else {
+        console.log(`Couldn't process object ${obj}`)
+        return
+    }
+
+    const data = obj.toObj()
+    
+    let ref
+    if (obj["ID"] == undefined) {
+        ref = db.collection(collection).doc()
+        data["ID"] = ref.id
+    } else {
+        ref = db.collection(collection).doc(obj["ID"])
+    }
+
+    const fields = FireDoc.getFields(obj)
+    Object.keys(fields).forEach(key => {
+        if (obj[key] === undefined) obj[key] = ""
     })
 
     console.log("New Doc", docRef.id)
@@ -77,60 +151,27 @@ function addRegistered(reg) {
     const hist = {
         Doc_ID: data["ID"],
         New_State: data,
-        Note: "Automatic registation from register.musicunbounded@gmail.com.",
+        Note: "Automatic addition to firestore.",
         Operation: "CREATE",
         Time: Date.now()
     }
     newHistory(hist)
     return data 
-}
+} 
 
 
 
-function createJob(job) {
-    const ref = db.collection.doc()
-    const json = job.json()
-    json["ID"] = ref.id
-    
-    ref.set(json)
-}
-
-
-
-function getRegsByName(name) {
-    return getDocsFromQuery(db.collection("Registered").where("Name", "==", name))
-}
-
-
-
-function getTeachersById(id) {
-    return getDocsFromQuery(db.collection("Teachers").where("Discord_ID", "==", id))
-}
-
-
-
-function getEmptyDoc(collectionName) {
-    return db.collection(collectionName).doc()
-}
-
-
-
-function addTeacher(data) {
-    const ref = db.collection("Teachers").doc()
-    data["ID"] = ref.id
-    ref.set(data)
+function getAllDocs(collection) {
+    return getDocsFromQuery(db.collection(collection))
 }
 
 
 
 module.exports = {
-    getAllJobs,
-    regExists,
-    addRegistered,
-    addTeacher,
-    createJob,
-    getRegsByName,
-    getTeachersById,
+    getAllDocs,
+    exists,
+    addToFirestore,
+    searchByFields,
 }
 
 

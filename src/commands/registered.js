@@ -32,30 +32,29 @@ async function infoGet(interaction) {
     const name = interaction.options.getString("name")
     getRegsByName(name).then(async docs => {
         const embeds = []
+        const regs = docs.map(doc => Registered.fromObj(doc))
+        
         const queryRes = new MessageEmbed()
             .setColor("#f7f7f7")
             .setTitle(`Query Results`)
             .setDescription(`Found ${docs.length} individual(s) named ${name}`)
         embeds.push(queryRes)
 
-        const order = ["Name", "Guardian", "Instrument", "Email", "Phone", "Prefers", "Platform", "Delivery", "Joined_On", "Statement"]
-        const inlines = new Set(["Name", "Guardian", "Instrument", "Email", 
-                                "Phone", "Prefers", "Platform", "Deliver", 
-                                "Joined_On"])
-
-        docs.forEach(doc => {
-            const hit = new MessageEmbed()
-                .setColor("#f7f7f7")
-                .setTitle(`Document ID: ${doc["ID"]}`)
-
-            
-            const fields = makeFields(doc, order, inlines)
-    
-            hit.addFields(fields)
-            embeds.push(hit)
-        })
+        regs.forEach(reg => embeds.push(reg.toEmbed()))
         await interaction.reply({embeds})
     })
+}
+
+
+
+function infoUpdate(interaction) {
+    /*
+    const thread = interaction.channel.threads.create({
+        name: "Update",
+        autArchiveDuration: ,
+        reason: 30,
+    }) 
+    */
 }
 
 

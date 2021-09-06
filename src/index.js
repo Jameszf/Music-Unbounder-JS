@@ -12,7 +12,7 @@ const schedule = require("node-schedule")
 const fs = require("fs")
 
 const gmail = require("./gmail.js")
-const { Registered, Email, Job } = require("./classes.js")
+const { Registered, Student, Email, Job } = require("./classes.js")
 const db = require("./firestore.js")
 
 
@@ -67,7 +67,7 @@ async function alertChannel(reg) {
             .addFields(reg.getEmbedFields())
 
     const buttons = [new MessageButton()
-            .setCustomId("UNKNOWN")
+            .setCustomId(customId)
             .setLabel("Accept as my Student")
             .setStyle("PRIMARY")]
     const row = new MessageActionRow()
@@ -198,7 +198,14 @@ client.on('interactionCreate', async interaction => {
             const userId = interaction.user.id
             db.getTeachersById(userId).then(async docs => {
                 if (docs.length == 1) {
-                    
+                    if (await db.exists("Registered", customId)) {
+                        const newStud = new Student("", "", "", "", customId, userId)
+                        db.addStudent(newStud)
+                    } else {
+                        interaction.reply({
+                            content: `Cannot find the registered person in the database. Cancelling Student takein.`)
+                        })
+                    }
                 } else if (docs.length > 1) {
                     console.log(`Discord ID ${userId} has multiple Teacher docs.`)
                     await interaction.reply({

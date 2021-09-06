@@ -1,5 +1,68 @@
 
-class Registered {
+class FireDoc {
+    /*
+        mapping: Object
+        order: Array
+        inlines: Set
+    */
+
+    static getFields(obj) {
+        if (obj instanceof Registered || obj === "Registered") {
+            return ["ID", "Name", "Guardian", 
+                    "Instrument", "Platform", 
+                    "Email", "Phone", "Prefers", 
+                    "From", "Statement", 
+                    "Joined_On", "Delivery"]
+        } else if (obj instanceof Student || obj === "Students") {
+            return ["ID", "Begin_Date", "End_Date",
+                    "Notes", "Registered_ID", 
+                    "Teacher_ID"]
+        } else if (obj instanceof Teacher || obj === "Teachers") {
+            return ["ID", "Discord_ID", "Email",
+                    "Instruments", "Lessons",
+                    "Name", "Phone", "Status"]
+        } else {
+            console.log(`Unrecognized object ${obj}`)
+            return []
+        }
+    }
+    
+
+
+    toEmbed(mapping, order, inlines) {
+        const { MessageEmbed } = require("discord.js")
+
+        const fields = []
+
+        let fieldOrder = order
+        if (order == undefined) fieldOrder = Object.keys(mapping)
+
+        for (let field of fieldOrder) {
+            const inline = inlines != undefined ? inlines.has(field) : false
+            let key = mapping[field], value = this[field]
+            if (key == undefined) key = field
+            if (value == "" || value == undefined) value = "N/A"
+            fields.push({name: key, value, inline})
+        }
+        
+        const embed = new MessageEmbed()
+                .setColor("#f7f7f7")
+                .setTitle(`Document ID: ${doc["ID"]}`)
+        
+        embed.addFields(fields)
+        return embed
+    }
+
+    toObj() {
+        const obj = {}
+        Object.keys(this).map(key => obj[key] = this[key])
+        return obj
+    }
+}
+
+
+
+class Registered extends FireDoc {
     constructor(ID, Name, Guardian, Instrument, 
                 Platform, Email, Phone, Prefers, 
                 From, Statement, Joined_On, Delivery) {
@@ -16,65 +79,92 @@ class Registered {
         this.Joined_On = Joined_On
         this.Delivery = Delivery
     }
-
+    
     
 
-    static empty() {
-        return new Registered(undefined, undefined, 
-                                undefined, undefined, 
-                                undefined, undefined, 
-                                undefined, undefined, 
-                                undefined, undefined,
-                                undefined, undefined)
-    }
-
-    
     static fromObj(obj) {
-        const fields = ["ID", "Name", "Guardian", 
-                        "Instrument", "Platform", 
-                        "Email", "Phone", "Prefers", 
-                        "From", "Statement", 
-                        "Joined_On", "Delivery"]
-        const reg = Registered.empty()
-        
-        for (let field of fields) {
-            reg[field] = obj[field]
-        }
-        
+        const fields = Firedoc.getFields("Registered")
+        const reg = new Registered()
+
+        fields.forEach(field => reg[field] = obj[field])
         return reg
     }
 
 
 
-    getEmbedFields() {
-        // TODO remove dupe code with registered.js
-        const fields = []
-        const order = ["Name", "Guardian", 
-                        "Instrument", "Email", 
-                        "Phone", "Prefers", 
-                        "Platform", "Delivery", 
-                        "Joined_On", "Statement"]
-        const inlines = new Set(["Name", "Guardian", 
-                                "Instrument", "Email", 
-                                "Phone", "Prefers", 
-                                "Platform", "Delivery", 
-                                "Joined_On"])
+    toEmbed() {
         const mapping = {
             "ID": "Document ID",
             "Phone": "Phone Number", 
             "Joined_On": "Joined On",
             "Found": "Found us from",
         }
+        const order = ["Name", "Guardian", 
+                        "Instrument", "Email", 
+                        "Phone", "Prefers", 
+                        "Platform", "Delivery", 
+                        "Joined_On", "Statement"]
 
-        for (let field of order) {
-            const inline = inlines.has(field)
-            let key = mapping[field], value = this[field]
-            if (key == undefined) key = field
-            if (value == "" || value == undefined) value = "N/A"
-            fields.push({name: key, value, inline})
-        }
+        const inlines = new Set(["Name", "Guardian", 
+                                "Instrument", "Email", 
+                                "Phone", "Prefers", 
+                                "Platform", "Delivery", 
+                                "Joined_On"])
+        return super().toEmbed(mapping, order, inlines)
+    }
+}
 
-        return fields
+
+
+class Teacher extends FireDoc {
+    constructor(ID, Discord_ID, Email, Instruments, Lessons, Name, Phone, Status) {
+        this.ID = ID
+        this.Discord_ID = Discord_ID
+        this.Email = Email
+        this.Instruments = Instruments
+        this.Lessons = Lessons
+        this.Name = Name
+        this.Phone = Phone
+        this.Status = Status
+    }
+
+    static fromObj(obj) {
+        const fields = Firedoc.getFields("Teachers")
+        const teach = new Teacher()
+
+        fields.forEach(field => teach[field] = obj[field])
+        return teach
+    }
+
+    toEmbed() {
+        const mapping = {}
+        return super().toEmbed(mapping)
+    }
+}
+
+
+
+class Student extends FireDoc {
+    constructor(Begin_Date, End_Date, ID, Notes, Registered_ID, Teacher_ID) {
+        this.Begin_Date = Begin_Date
+        this.End_Date = End_Date
+        this.ID = ID
+        this.Notes = Notes
+        this.Registered_ID = Registered_ID
+        this.Teacher_ID = Teacher_ID
+    }
+
+    static fromObj(obj) {
+        const fields = Firedoc.getFields("Students")
+        const stud = new Student()
+
+        fields.forEach(field => stud[field] = obj[field])
+        return stud
+    }
+
+    toEmbed() {
+        const mapping = {}
+        return super().toEmbed(mapping)
     }
 }
 
@@ -140,13 +230,12 @@ class Job {
 
 
 
-
-
-
 module.exports = {
     Job,
     Registered,
-    Email
+    Email,
+    Teacher,
+    Student
 }
 
 
