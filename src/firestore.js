@@ -31,67 +31,41 @@ function getDocsFromQuery(query) {
 
 
 
-function getAllJobs() {
-    return getDocsFromQuery(db.collection("Jobs"))
-}
-
-
-
-function softTeacherMatch(teach) {
-    return new Promise((resolve, reject) => {
-        db.collection("Teachers")
-            .where("Name", "==", teach["Name"])
-            .where("Email", "==", teach["Email"])
-            .where("Phone", "==", teach["Phone"])
-            .get().then(snapshot => {
-                resolve(!snapshot.empty)
-            }).catch(err => reject(err))
-}
-
-
-
-function softStudentMatch(stud) {
-    return new Promise((resolve, reject) => {
-        db.collection("Students")
-            .where("Registerd_ID", "==", stud["Registered_ID"])
-            .where("Teacher_ID", "==", stud["Teacher_ID"])
-            .get().then(snapshot => {
-                resolve(!snapshot.empty)
-            }).catch(err => reject(err))
-}
-
-
-
-function softRegisteredMatch(reg) {
-    return new Promise((resolve, reject) => {
-        db.collection("Registered")
-            .where("Name", "==", reg["Name"])
-            .where("Guardian", "==", reg["Guardian"])
-            .where("Instrument", "==", reg["Instrument"]).get().then(snapshot => {
-                resolve(!snapshot.empty)
-            }).catch(err => reject(err))
-}
-
-
-
 async function exists(coll, input) {
     return new Promise((resolve, reject) => {
         if (coll === undefined) reject("Need collection to search with.")
         if (typeof input === "string") { // search by ID
-            db.collection(coll)
-                .doc(input).get().then(snapshot => {
+            db.collection(coll).doc(input).get()
+                .then(snapshot => {
                     resolve(!snapshot.empty)
                 }).catch(err => reject(err))
         } else {
+            const data = input.toObj()
+            let queryValues
             if (coll === "Teachers") {
-                resolve(await softTeacherMatch(input))
+                queryValues = {
+                    "Name": data["Name"],
+                    "Email": data["Email"],
+                    "Phone": data["Phone"],
+                }
             } else if (coll === "Students") {
-                resolve(await softStudentMatch(input))
-            } else if (coll === "Registered) {
-                resolve(await softRegisteredMatch(input))
+                queryValues = {
+                    "Registered_ID": data["Registered_ID"],
+                    "Teacher_ID": data["Teacher_ID"],
+                }
+            } else if (coll === "Registered") {
+                queryValues = {
+                    "Name": data["Name"],
+                    "Guardian": data["Guardian"],
+                    "Instrument": data["Instrument"],
+                }
             } else {
                 reject(`Unmatchable input: (collection) ${coll}\n(input) ${input}`)
             }
+
+            searchByFields(coll, queryValues)
+                .then(docs => resolve(docs.length != 0))
+                .catch(err => reject(err))
         }
     })
 }
@@ -107,11 +81,16 @@ function newHistory(hist) {
 
 
 function searchByFields(collection, fieldValues) {
-    let req = db.collection(collection)
-    Object.keys(fieldValues).forEach(key => {
-        req = req.where(key, "==", fieldValues[key])
+    return new Promise((resolve, reject) => {
+        console.log(fieldValues)
+        let req = db.collection(collection)
+        Object.keys(fieldValues).forEach(key => {
+            req = req.where(key, "==", fieldValues[key])
+        })
+        getDocsFromQuery(req)
+            .then(docs => resolve(docs))
+            .catch(err => reject(err))
     })
-    return getDocsFromQuery(req)
 }
 
 
@@ -130,19 +109,18 @@ function addToFirestore(obj) {
         return
     }
 
-    const data = obj.toObj()
-    
     let ref
     if (obj["ID"] == undefined) {
         ref = db.collection(collection).doc()
-        data["ID"] = ref.id
+        obj["ID"] = ref.id
     } else {
         ref = db.collection(collection).doc(obj["ID"])
     }
 
+    const data = obj.toObj()
     const fields = FireDoc.getFields(obj)
     Object.keys(fields).forEach(key => {
-        if (obj[key] === undefined) obj[key] = ""
+        if (data[key] === undefined) data[key] = ""
     })
 
     console.log("New Doc", docRef.id)
@@ -151,13 +129,28 @@ function addToFirestore(obj) {
     const hist = {
         Doc_ID: data["ID"],
         New_State: data,
-        Note: "Automatic addition to firestore.",
+        Note: "Automatic addition to firestore from discord bot.",
         Operation: "CREATE",
         Time: Date.now()
     }
     newHistory(hist)
-    return data 
+    return obj
 } 
+
+
+
+function removeDoc(collection, docId) {
+    db.collection(collection).doc(docId).delete()
+
+    const hist = {
+        Doc_ID: docId,
+        New_State: "N/A",
+        Note: "Automatic deletion to firestore from discord bot.",
+        Operation: "DELETE",
+        Time: Date.now(),
+    }
+    newHistory(hist)
+}
 
 
 
@@ -167,8 +160,36 @@ function getAllDocs(collection) {
 
 
 
+async function modifyDoc(collection, id, mods) {
+    await db.collection(collection).doc(id).update(mods)
+    const req = await db.collection(collection).doc(id).get()
+    
+    if (req.exists) {
+        const newState = req.data()
+        const hist = {
+            "Doc_ID": id,
+            "New_State": newState,
+            "Note": "From discord bot.",
+            "Operation": "UPDATE",
+            "Time": Date.now(),
+        }
+        newHistory(hist)
+    } else {
+        console.log(`ERROR: modifyDoc could not get new state after modifying document ${id} in collection ${collection}. 
+                    Applied these modifications: ${mods}`)
+    }
+}
+
+
+async function getDocById(collection, docId) {
+    return await db.collection(collection).doc(docId).get()
+}
+
+
+
 module.exports = {
     getAllDocs,
+    getDocById,
     exists,
     addToFirestore,
     searchByFields,

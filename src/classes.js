@@ -29,7 +29,7 @@ class FireDoc {
     
 
 
-    toEmbed(mapping, order, inlines) {
+    _toEmbed(mapping, order, inlines) {
         const { MessageEmbed } = require("discord.js")
 
         const fields = []
@@ -42,12 +42,13 @@ class FireDoc {
             let key = mapping[field], value = this[field]
             if (key == undefined) key = field
             if (value == "" || value == undefined) value = "N/A"
+            if (value instanceof Array) value = value.join(", ")
             fields.push({name: key, value, inline})
         }
         
         const embed = new MessageEmbed()
                 .setColor("#f7f7f7")
-                .setTitle(`Document ID: ${doc["ID"]}`)
+                .setTitle(`Document ID: ${this["ID"]}`)
         
         embed.addFields(fields)
         return embed
@@ -55,7 +56,15 @@ class FireDoc {
 
     toObj() {
         const obj = {}
-        Object.keys(this).map(key => obj[key] = this[key])
+        Object.keys(this).map(key => {
+            if (key == "Instrument" && this["Instrument"] == undefined) {
+                obj["Instrument"] = []
+            } else if (this[key] == undefined && key != "Instrument") {
+                obj[key] = ""
+            } else {
+                obj[key] = this[key]
+            }
+        })
         return obj
     }
 }
@@ -66,6 +75,7 @@ class Registered extends FireDoc {
     constructor(ID, Name, Guardian, Instrument, 
                 Platform, Email, Phone, Prefers, 
                 From, Statement, Joined_On, Delivery) {
+        super()
         this.ID = ID
         this.Name = Name
         this.Guardian = Guardian
@@ -82,35 +92,40 @@ class Registered extends FireDoc {
     
     
 
+    // TODO remove dupe code
     static fromObj(obj) {
         const fields = Firedoc.getFields("Registered")
         const reg = new Registered()
 
-        fields.forEach(field => reg[field] = obj[field])
+        fields.forEach(field => {
+            if (obj[field] == "") { 
+                reg[field] = undefined
+            } else {
+                reg[field] = obj[field]
+            }
+        })
         return reg
     }
 
 
 
-    toEmbed() {
+    toEmbed(limited = true) {
         const mapping = {
             "ID": "Document ID",
             "Phone": "Phone Number", 
             "Joined_On": "Joined On",
             "Found": "Found us from",
         }
-        const order = ["Name", "Guardian", 
-                        "Instrument", "Email", 
-                        "Phone", "Prefers", 
-                        "Platform", "Delivery", 
-                        "Joined_On", "Statement"]
+
+        let order = ["Name", "Guardian", "Instrument", "Email", "Phone", "Prefers", "Platform", "Delivery", "Joined_On", "Statement"]
+        if (limited) order = ["Instrument", "Statement"] 
 
         const inlines = new Set(["Name", "Guardian", 
                                 "Instrument", "Email", 
                                 "Phone", "Prefers", 
                                 "Platform", "Delivery", 
                                 "Joined_On"])
-        return super().toEmbed(mapping, order, inlines)
+        return this._toEmbed(mapping, order, inlines)
     }
 }
 
@@ -118,6 +133,7 @@ class Registered extends FireDoc {
 
 class Teacher extends FireDoc {
     constructor(ID, Discord_ID, Email, Instruments, Lessons, Name, Phone, Status) {
+        super()
         this.ID = ID
         this.Discord_ID = Discord_ID
         this.Email = Email
@@ -132,13 +148,27 @@ class Teacher extends FireDoc {
         const fields = Firedoc.getFields("Teachers")
         const teach = new Teacher()
 
-        fields.forEach(field => teach[field] = obj[field])
+        fields.forEach(field => {
+            if (obj[field] == "") { 
+                teach[field] = undefined
+            } else {
+                teach[field] = obj[field]
+            }
+        })
         return teach
     }
 
     toEmbed() {
-        const mapping = {}
-        return super().toEmbed(mapping)
+        const mapping = {
+            "ID": "Document ID",
+            "Phone": "Phone Number", 
+            "Status": "Is Accepting Students",
+        }
+        const order = ["Name", "Email", "Phone",
+                        "Instruments", "Status",]
+
+        const inlines = new Set(["Email", "Phone",])
+        return this._toEmbed(mapping, order, inlines)
     }
 }
 
@@ -146,6 +176,7 @@ class Teacher extends FireDoc {
 
 class Student extends FireDoc {
     constructor(Begin_Date, End_Date, ID, Notes, Registered_ID, Teacher_ID) {
+        super()
         this.Begin_Date = Begin_Date
         this.End_Date = End_Date
         this.ID = ID
@@ -158,13 +189,19 @@ class Student extends FireDoc {
         const fields = Firedoc.getFields("Students")
         const stud = new Student()
 
-        fields.forEach(field => stud[field] = obj[field])
+        fields.forEach(field => {
+            if (obj[field] == "") {
+                stud[field] = undefined
+            } else {
+                stud[field] = obj[field]
+            }
+        })
         return stud
     }
 
     toEmbed() {
         const mapping = {}
-        return super().toEmbed(mapping)
+        return this._toEmbed(mapping)
     }
 }
 
@@ -213,18 +250,38 @@ class Email {
 
 
 class Job {
-    constructor(Time, Type, Data) {
+    /*
+    Type:
+        EMAIL
+        DISCORD_MESSAGE
+    */
+    constructor(Time, Type, Completed, Data) {
         this.Time = Time
         this.Type = Type
+        this.Completed = Completed
         this.Data = Data
+    }
+
+    fromObj(obj) {
+        return new Job(
+            obj["Time"],
+            obj["Type"],
+            obj["Completed"],
+            obj["Data"],
+        )
     }
 
     json() {
         return {
             "Time": this.Time,
             "Type": this.Type,
+            "Completed": this.Completed,
             "Data": this.Data
         }
+    }
+    
+    todo() {
+        return Date.now() > this.Time && this.Completed
     }
 }
 

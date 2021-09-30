@@ -4,6 +4,8 @@ const readline = require("readline")
 const { google } = require("googleapis")
 
 
+const { Email } = require("./classes.js")
+
 // If modifying these scopes, delete token.json.
 const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
 // The file token.json stores the user"s access and refresh tokens, and is
@@ -30,6 +32,24 @@ fs.readFile(CRED_PATH, (err, content) => {
  * @param {function} callback The callback to call with the authorized client.
  */
 
+let service = undefined
+
+function getService() {
+    return new Promise(async (resolve, reject) => {
+        if (service == undefined) {
+            const auth = await authorize()
+            service = google.gmail({version: "v1", auth: auth})
+        }
+
+        await isOperational(service).then(res => {
+            if (res) {
+                resolve(service)
+            } else {
+                reject("NOT_OPERATIONAL")
+            }
+        })
+    })
+}
 
 function readCredentials() {
     return new Promise((resolve, reject) => {
@@ -104,7 +124,7 @@ function isOperational(service) {
         try { 
             service.users.labels.list({ userId: "me" })
             resolve(true)
-        } catch (error) {
+        } catch (e) {
             console.log("ERROR!")
             console.log(error)
             resolve(false)
@@ -113,54 +133,66 @@ function isOperational(service) {
 }
 
 
-/*
-export default {
-    use(callback) {
-        if (service != undefined) {
 
-        }
-    }
-}
-*/
+function parseEmails(emailIds) {
+    return new Promise((resolve, reject) => {
+        getService().then(async service => {
+            const filtered = []
+            for (let id of emailIds) {
+                const res = await service.users.messages.get({
+                    "userId": "me",
+                    "id": id.id,
+                })
 
-/*
-async function listLabels() {
-    const auth = await authorize()
-    const gmail = google.gmail({version: 'v1', auth});
-    gmail.users.labels.list({
-        userId: 'me',
-    }, (err, res) => {
-        if (err) return console.log('The API returned an error: ' + err);
-        const labels = res.data.labels;
-        if (labels.length) {
-            console.log('Labels:');
-            labels.forEach((label) => {
-                console.log(`- ${label.name}`);
-            });
-        } else {
-            console.log('No labels found.');
-        }
-    });
-}
-
-listLabels()
-*/
-
-let service = undefined
-module.exports = {
-    getService: function() {
-        return new Promise(async (resolve, reject) => {
-            if (service == undefined) {
-                const auth = await authorize()
-                service = google.gmail({version: "v1", auth: auth})
+                if (res.status == 200) {
+                    for (let header of res.data.payload.headers) {
+                        if (header.name == "Subject" && header.value == "Automatic Student Registration") {
+                            const buff = Buffer.from(res.data.payload.body.data, "base64")
+                            const body = buff.toString("utf-8")
+                            const subject = header.value
+                            filtered.push(new Email(subject, body))
+                            break
+                        }
+                    }
+                } else {
+                    reject("parseEmails res.status != 200 ", res)
+                }
             }
-
-            resolve(service)
-        })
-    },
-    isOperational
+            resolve(filtered)
+        }).catch(err => reject(err))
+    })
 }
 
 
+
+function checkGmail() {
+    return new Promise((resolve, reject) => {
+        getService().then(async service => {
+            const res = await service.users.messages.list({
+                q: `in:inbox is:unread`,
+                userId: 'me',
+            });
+        
+            if (res.status == 200) {
+                if (res.data.resultSizeEstimate > 0) {
+                    resolve(res.data.messages)
+                } else {
+                    resolve([])
+                }
+            } else {
+                reject(res)
+            }
+        }).catch(err => {
+           reject(err)
+        })
+    })
+}
+
+
+
+module.exports = {
+    checkGmail,
+    parseEmails,
+}
 
 

@@ -30,26 +30,81 @@ async function getUserInput(interaction, prom) {
     console.log("Recieved interaction:")
     console.log(interaction)
     await interaction.reply({ content: prom })
-
-    let input
-    let done = false
-    while (!done) {
-        const filter = m => true
-        const collector = interaction.channel.creteMessageCollor({ filter, time: 30000 })
+    
+    return new Promise((resolve, reject) => {
+        let good = false
+        const filter = m => m
+        const collector = interaction.channel.createMessageCollector({ filter, time: 30000 })
         
         collector.on("collect", m => {
-            input = m.content
-            done = true
+            console.log(m)
+            good = true
             collector.stop()
+            resolve(m.content)
         })
 
         collector.on("end", async m => {
-            if (!done) {
-                await interaction.reply({ content: "Please answer the question.", ephemeral: true })
+            if (!good) {
+                reject("Collector did not recieve input.")
             }
         })
+    })
+}
+
+
+
+async function getInput(thread, prompts, res, finished) {
+    if (prompts.length === 0) return finished(thread, res)
+
+    await thread.send(prompts[0])
+    prompts.shift()
+    
+    let input = ""
+    let good = false
+    const filter = m => m
+    const collector = thread.createMessageCollector({ filter, time: 60000 })
+    
+    collector.on("collect", m => {
+        good = true
+        input = m.content
+        collector.stop()
+    })
+
+    // TODO handle no input scenario
+    collector.on("end", m => {
+        if (good) {
+            res.push(input)
+            getInput(thread, prompts, res, finished)
+        }
+    })
+}
+
+
+
+async function processInput(thread, res) {
+    const data = {
+        "Name": res[1],
+        "Email": res[2],
+        "Phone": res[3],
+        "Instruments": res[4].split(", "),
+        "Discord_ID": res[0],
+        "Status": "UNKNOWN",
     }
-    return input
+    db.addToFirestore("Teachers", data)
+    await thread.send("You have been successfully registered!\nThis will now be archived in 10 seconds.")
+    setTimeout(async () => await thread.setArchived(true), 10000)
+}
+
+
+async function inputThread(interaction, prompts) {
+    // TODO handle when thread archives whilst user is still inputting
+    const thread = await interaction.channel.threads.create({
+        "name": "Input Thread",
+        "autoArchiveDuration": 60,
+        "reason": "Get input from user.",
+    })
+    
+    getInput(thread, prompts, [interaction.user.id], processInput)
 }
 
 
@@ -91,100 +146,87 @@ module.exports = {
 
         if (subcommand == "register") {
             const userId = interaction.user.id 
-            console.log(`Registering user ${userId} as a teacher.`)
-            db.getTeachersById(userId).then(async docs => {
-                if (docs.length == 0) {
-                    // TODO make this create a new thread (for organization purposes)
-                    const proms = ["What your full name?", 
-                                    "What email should people use to contact you?", 
-                                    "What phone number should people use to contact you?",
-                                    `What instrument(s) are you teaching?\n
-                                    If you are teaching multiple instruments please separate different 
-                                    instruments by a comman followed by a space.\ne.g Piano, Trombone`,]
-                    const res = []
-                    for (let prom of proms) {
-                        res.push(await getUserInput(interaction, prom))
-                    }
-
-                    db.addTeacher({
-                        "Discord_ID": userId,
-                        "Name": res[0],
-                        "Email": res[1],
-                        "Phone": res[2],
-                        "Instruments": res[3].split(", "),
-                        "Status": "UNKNOWN",
-                        "Lessons": [],
+            console.log(`Registering user ${userId} as a teacher...`)
+            db.searchByFields("Teachers", {"ID": userId})
+                .then(docs => docs.map(doc => Teacher.fromObj(doc)))
+                    .then(async docs => {
+                        if (docs.length == 0) {
+                            // TODO make this create a new thread (for organization purposes)
+                            const prompts = ["What your full name?", 
+                                            "What email should people use to contact you?", 
+                                            "What phone number should people use to contact you?",
+                                            `What instrument(s) are you teaching?
+        If you are teaching multiple instruments please separate different instruments by a comman followed by a space.
+        e.g Piano, Trombone`,]
+                            
+                            inputThread(interaction, prompts)
+                            await interaction.reply({ 
+                                content: "Please enter your information in the thread.", 
+                                ephemeral: true
+                            })
+                            /*
+                            const row = new MessageActionRow()
+                                .addComponents(
+                                    new MessageSelectMenu()
+                                        .setCustomId(docRef.id)
+                                        .setPlaceholder("Nothing selected")
+                                        .addOptions([
+                                            {
+                                                label: "Unknown",
+                                                description: "Unsure if able to accept new students or not.",
+                                                value: "UNKNOWN",
+                                            },
+                                            {
+                                                label: "Open",
+                                                description: "Accepting new students at the moment.",
+                                                value: "OPEN",
+                                            },
+                                            {
+                                                label: "Closed",
+                                                description: "Refusing new students at the moment.",
+                                                value: "CLOSED",
+                                            },
+                                        ])
+                                )
+                            await interaction.reply({ content: "What is your current status on taking in students?", components: [row] })
+                            */
+                        } else {
+                            const queryRes = new MessageEmbed()
+                                .setColor("#f7f7f")
+                                .setTitle("Someone is already in the system!")
+                                .setDescription("There seems to be atleast 1 person in the system that shares the same discord ID as you!")
+                            
+                            const embeds = [ queryRes, ]
+                            docs.forEach((doc, i) => {
+                                const hit = doc.toEmbed()
+                                hit.setTitle(`User #${i + 1}`)
+                                embeds.push(hit)
+                            })
+                            await interaction.reply({ 
+                                embeds,
+                                ephemeral: true })
+                        }
                     })
-                
-                    await interaction.reply({ content: "Successfully added you to the system!", ephemeral: true})
-                    /*
-                    const row = new MessageActionRow()
-                        .addComponents(
-                            new MessageSelectMenu()
-                                .setCustomId(docRef.id)
-                                .setPlaceholder("Nothing selected")
-                                .addOptions([
-                                    {
-                                        label: "Unknown",
-                                        description: "Unsure if able to accept new students or not.",
-                                        value: "UNKNOWN",
-                                    },
-                                    {
-                                        label: "Open",
-                                        description: "Accepting new students at the moment.",
-                                        value: "OPEN",
-                                    },
-                                    {
-                                        label: "Closed",
-                                        description: "Refusing new students at the moment.",
-                                        value: "CLOSED",
-                                    },
-                                ])
-                        )
-                    await interaction.reply({ content: "What is your current status on taking in students?", components: [row] })
-                    */
                 } else {
-                    const queryRes = new MessageEmbed()
-                        .setColor("#f7f7f")
-                        .setTitle("Someone is already in the system!")
-                        .setDescription("There seems to be atleast 1 person in the system that shares the same discord ID as you!")
-                    
-                    const embeds = [ queryRes, ]
-                    for (let i = 0; i < docs.length; i++) {
-                        let doc = docs[i]
-                        const fields = makeTeacherFields(doc)
-                        const hit = new MessageEmbed()
-                            .setColor("#f7f7f7")
-                            .setTitle(`User #${i + 1}`)
-                            .addFields(fields)
-                        results.push(hit)
-                    }
-                    await interaction.reply({ 
-                        embeds,
-                        ephemeral: true })
-                }
-            })
-            await interaction.reply("D:")
-        } else {
-            const group = interaction.options.getSubcommandGroup()
+                    const group = interaction.options.getSubcommandGroup()
 
-            if (group === "info") {
-                const name = interaction.options.getString("name")
-                switch (subcommand) {
-                    case "get":
-                        console.log("Getting...")
-                        break
-                    case "update":
-                        console.log("Updating...")
-                        break
-                    default :
-                        console.log(`Unknown subcommand: ${subcommand}`)
+                    if (group === "info") {
+                        const name = interaction.options.getString("name")
+                        switch (subcommand) {
+                            case "get":
+                                console.log("Getting...")
+                                break
+                            case "update":
+                                console.log("Updating...")
+                                break
+                            default :
+                                console.log(`Unknown subcommand: ${subcommand}`)
+                        }
+                        await interaction.reply("D:")
+                    } else {
+                        console.log(`Unknown subcommand group: ${group}`)
+                    }
                 }
-                await interaction.reply("D:")
-            } else {
-                console.log(`Unknown subcommand group: ${group}`)
-            }
-        }
     }
 }
 
