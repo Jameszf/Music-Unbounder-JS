@@ -112,13 +112,11 @@ class Registered extends FireDoc {
     toEmbed(limited = true) {
         const mapping = {
             "ID": "Document ID",
-            "Phone": "Phone Number", 
             "Joined_On": "Joined On",
-            "Found": "Found us from",
         }
 
         let order = ["Name", "Guardian", "Instrument", "Email", "Phone", "Prefers", "Platform", "Delivery", "Joined_On", "Statement"]
-        if (limited) order = ["Instrument", "Statement"] 
+        if (limited) order = ["ID", "Instrument", "Joined_On"] 
 
         const inlines = new Set(["Name", "Guardian", 
                                 "Instrument", "Email", 
@@ -208,6 +206,7 @@ class Student extends FireDoc {
 
 
 class Email {
+    // TODO repurpose class
     constructor(subject, body) {
         this.subject = subject
         this.body = body
@@ -251,25 +250,52 @@ class Email {
 
 class Job {
     /*
-    Type:
-        EMAIL
-        DISCORD_MESSAGE
+        Time (Integer): Time to execute.
+
+        Type (Enum): Type of job to execute.
+            EMAIL: Send an email.
+            DISCORD: Send a direct message.
+
+        Status (Enum): Current status on execution.
+            COMPLETE: Successful execution.
+            ERROR: Error during execution.
+            EXPIRED: Time of execution passed without execution.
+            ONGOING: Prior to execution.
+            CANCELLED: Execuction was cancelled.
+    
+        Data (Object): Data neccesary for job to execute (unformatted).
     */
-    constructor(Time, Type, Completed, Data) {
+    constructor(Time, Type, Status, Data) {
         this.Time = Time
         this.Type = Type
-        this.Completed = Completed
+        this.Status = Status
         this.Data = Data
     }
 
-    fromObj(obj) {
+    static fromObj(obj) {
         return new Job(
             obj["Time"],
             obj["Type"],
-            obj["Completed"],
+            obj["Status"],
             obj["Data"],
         )
     }
+
+
+    static getTodo(jobs) {
+        return jobs.filter(job => job.isOngoing())   
+    }
+
+
+    isExpired() {
+        return this.Time < Date.now() || this.Status == "COMPLETED"
+    }
+
+    
+    isOngoing() {
+        return this.Time > Date.now() && this.Status == "ONGOING"
+    }
+
 
     json() {
         return {
@@ -278,10 +304,6 @@ class Job {
             "Completed": this.Completed,
             "Data": this.Data
         }
-    }
-    
-    todo() {
-        return Date.now() > this.Time && this.Completed
     }
 }
 

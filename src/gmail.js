@@ -191,6 +191,7 @@ function checkGmail() {
 
 
 module.exports = {
+    authorize,
     checkGmail,
     parseEmails,
 }
