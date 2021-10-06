@@ -2,11 +2,11 @@ const nodemailer = require("nodemailer");
 
 
 async function sendEmail(destEmail, email) {
-    let transporter
     // 465 (SSL) secure: true
     // 587 (TLS) secure: false
+    let config
     if (process.env.PRODUCTION) {
-        transporter = nodemailer.createTransport({
+        config = {
             host: "smtp.gmail.com",
             port: 465,
             secure: true, 
@@ -14,10 +14,10 @@ async function sendEmail(destEmail, email) {
                 user: process.env.NOREPLY_USER, 
                 pass: process.env.NOREPLY_PASS, 
             },
-        });
+        }
     } else {
         // Using ethereal.email email to send mail.
-        transporter = nodemailer.createTransport({
+        config {
             host: "smtp.ethereal.email",
             port: 587,
             secure: false,
@@ -25,9 +25,10 @@ async function sendEmail(destEmail, email) {
                 user: process.env.TEST_EMAIL_USER, 
                 pass: process.env.TEST_EMAIL_PASS, 
             },
-        });
+        }
     }
 
+    transporter = nodemailer.createTransport(config);
     console.log(`[EMAIL] Sending ${email.subject} to ${email.body}`)
     let info = await transporter.sendMail({
         from: process.env.NOREPLY_USER, // sender address
