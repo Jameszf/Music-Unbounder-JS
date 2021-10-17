@@ -121,12 +121,18 @@ async function registCmds() {
     const rest = new REST({ version: "9" }).setToken(process.env.BOT_TOKEN)
     const commandFiles = fs.readdirSync("./src/commands").filter(file => file.endsWith(".js"))
     const commands = []
-    
+
+/*    
     for (const file of commandFiles) {
         const command = require(`./commands/${file}`)
         client.commands.set(command.data.name, command)
         commands.push(command.data.toJSON())
     } 
+*/
+    const command = require("./commands/info.js")
+    client.commands.set(command.data.name, command)
+    commands.push(command.data.toJSON())
+
     try {
         await rest.put(
             Routes.applicationGuildCommands(

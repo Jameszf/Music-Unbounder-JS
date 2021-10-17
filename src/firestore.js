@@ -163,7 +163,7 @@ function getAllDocs(collection) {
 async function modifyDoc(collection, id, mods) {
     await db.collection(collection).doc(id).update(mods)
     const req = await db.collection(collection).doc(id).get()
-    
+   
     if (req.exists) {
         const newState = req.data()
         const hist = {
@@ -184,6 +184,8 @@ async function modifyDoc(collection, id, mods) {
 async function getDocById(collection, docId) {
     return await db.collection(collection).doc(docId).get()
 }
+
+
 
 
 

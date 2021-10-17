@@ -6,5 +6,7 @@ serviceAccount.json
 credentials.json
 token.json
 .env
-
-
+\#*\#
+\.\#*
+test.js
+*~
